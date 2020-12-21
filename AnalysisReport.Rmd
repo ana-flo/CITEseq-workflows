@@ -1,0 +1,114 @@
+---
+title: "Preliminary analysis report for CITEseq lung cancer data, focus on FAP and CD40"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(drake)
+library(Seurat)
+library(CiteFuse)
+library(SingleCellExperiment)
+
+setwd("C:/Users/aflorescu/Molecular Partners AG/DEV_TP_ExVivo - Ana/Rscripts/Rprojects/CITEseq-workflows")
+#source("CITEseq-functions-seurat-based.R")
+```
+
+## Introduction
+
+This report refers to the dataset with accession GSE154826. A preprint of the paper can be found at https://www.biorxiv.org/content/10.1101/2020.07.16.207605v2 . 
+
+
+The work contains CITEseq analysis with several antibody sets, or RNAseq with 5' and TCR seq but no antibody tags. By the size and composition of the antibody panels I have split the CITEseq data into NonImmune, Immune21, Immune29 and Immune59 so data with identical panels is analyzed in a single batch. This work refers to the NonImmune panel. 
+
+This analysis is considered preliminary because it still lacks the following steps:
+
+ *refining of cell types using Azimuth and the protein information
+ *confirmed that the epithelial are tumor cells, and call tumor cells using CNV
+ *deeper understanding of clusters
+ *cell cycle analysis
+ *receptor ligand interactions
+
+ The most urgent question to be answer was the correlation between RNA and surface protein levels, and that mainly refers to non immune cell types, so so far a basic cell typing using SingleR should be sufficient. This will be refined. 
+
+```{r, include=FALSE, echo = FALSE}
+MyColorsCellTypes <- c("B cell" = "#1F77B4", "CD8 T cell"="#AEC7E8",  "fibroblast"="#FF7F0E", "myeloid dendritic cell"="#FFBB78", 
+                       "plasma cell"="#2CA02C", "epithelial cell"="#98DF8A", "natural killer cell"="#D62728", "macrophage"="#FF9896", "CD4 T cell"="#9467BD", "endothelial cell"="#C5B0D5", "regulatory T cell"="#8C564B", "monocyte"="#E377C2", "unclassified"="#BCBD22")
+```
+
+```{r,  echo=FALSE, warning=FALSE}
+SeuratObj <- drake::readd(SeuratObj.singler)
+SeuratObj <- SetIdent(SeuratObj, value="cluster.type.singler" )
+p1 <-DimPlot(SeuratObj, reduction = "wnn.umap", cols=MyColorsCellTypes)
+SeuratObj <- SetIdent(SeuratObj, value="orig.ident")
+p2<-DimPlot(SeuratObj, reduction = "wnn.umap")
+SeuratObj <- SetIdent(SeuratObj, value="SAMPLE_TISSUE_OF_ORIGIN")
+p3<-DimPlot(SeuratObj, reduction = "wnn.umap")
+p1
+p2
+p3
+```
+
+We notice that indeed batch 93 seems to separate from the others, suggesting that the hashtagging did not work well, as also infered from the hahstag demultiplexing (see demultiplex report). We will remove it from further analysis. 
+
+
+```{r, include=FALSE, echo=FALSE}
+#remove batch 93 and convert seurat object to sce
+SeuratObj<- subset(SeuratObj, orig.ident != "batch_93")
+#sceObj <- Seurat.multimodal.sce(SeuratObj) 
+```
+
+Now we will start looking at FAP and CD40 ADT expression, first subsetting in the tumor group. The data shows we need to clarify the unknown group and refine the fibroblast and differentiate B cells and plasma cells. 
+
+```{r, echo=FALSE, warning=FALSE}
+SeuratObj.tumor <- subset(SeuratObj, SAMPLE_TISSUE_OF_ORIGIN=="tumor")
+SeuratObj.tumor <- SetIdent(SeuratObj.tumor, value="cluster.type.singler" )
+##Seurat seems to have a bug that does not allow subsetting once the ADT have been renamed
+rownames(SeuratObj.tumor[["ADT"]]@data) <- paste("ADT",rownames(SeuratObj.tumor[["ADT"]]@data), sep="-" )
+p1 <-RidgePlot(SeuratObj.tumor, features =  "ADT-FAP.1",cols = MyColorsCellTypes )
+p2 <- RidgePlot(SeuratObj.tumor, features =  "ADT-CD40.1",cols = MyColorsCellTypes )
+p1
+p2
+```
+
+Looking at EPCAM expression, it seems that both wnn clustering and  SinglerR could have difficulty in separating endothelial cells from fibroblasts, so this needs to be looked at in more detail. Remember that SingleR only uses RNA to assign cell types. 
+
+
+```{r, echo=FALSE, warning=FALSE}
+p1 <-RidgePlot(SeuratObj.tumor, features =  "ADT-EPCAM.1",cols = MyColorsCellTypes )
+p1
+```
+
+
+Now we will do a scatterplot to visualize correlation between protein and RNA. The discrete values in the ADT space suggest that there were not enough reads. 
+
+
+```{r, echo=FALSE}
+DefaultAssay(SeuratObj.tumor) <- 'SCT'
+FeatureScatter(SeuratObj.tumor,"FAP", "ADT-FAP.1")
+FeatureScatter(SeuratObj.tumor,"CD40", "ADT-CD40.1")
+```
+
+Look at FAP -EPCAM and FAP-CD40 coexpression, at the protein level, we see that indeed there is low EPCAM and FAP coexpression suggesting cell type assignment needs to be checked. 
+
+```{r, echo=FALSE}
+sceObj <- Seurat.multimodal.sce(SeuratObj.tumor) 
+visualiseExprs(sceObj, 
+                    plot = "pairwise",altExp_name = "ADT",
+                    feature_subset = c("FAP.1", "EPCAM.1"))
+visualiseExprs(sceObj, 
+                    plot = "pairwise",altExp_name = "ADT",
+                   feature_subset = c("FAP.1", "Podoplanin"))
+visualiseExprs(sceObj, 
+                    plot = "pairwise",altExp_name = "ADT",
+                   feature_subset = c("FAP.1", "CD40.1"))
+```
+
+Save Seurat and sce objects for later use
+
+```{r, echo = FALSE}
+saveRDS(SeuratObj, "C:/Users/aflorescu/Molecular Partners AG/DEV_TP_ExVivo - Ana/ToTransfer/Citeseq-lung-nonimmune-panel-cell clycle-seurat.rds")
+#saveRDS(sceObj, "C:/Users/aflorescu/Molecular Partners AG/DEV_TP_ExVivo - Ana/ToTransfer/Citeseq-lung-nonimmune-panel-sce.rds")
+
+```
+
