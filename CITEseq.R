@@ -26,20 +26,23 @@ library(drake)
 #define functions that are needed and include function library files
 
 #--------------------------------
+setwd("C:/Users/aflorescu/Molecular Partners AG/DEV_TP_ExVivo - Ana/Rscripts/Rprojects/CITEseq-workflows")
+source("CITEseq-functions-seurat-based.R")
 
 #============================================================================================================
 #main workflow
 
 plan <- drake_plan(
   
- SeuratObj = readRDS("C:/data/10x datasets/To-process/GSE154826-Lung-CITEseq/CITEseq/Citeseq-lung-nonimmune-panel.rds"),
- HTO.annot = 
-  
-  
+ SeuratObj = readRDS("C:/Users/aflorescu/Molecular Partners AG/DEV_TP_ExVivo - Ana/ToTransfer/Citeseq-lung-nonimmune-panel-with-doublet-calls-seurat.rds"),
+ Seurat.wnn = Seurat.dimred.wnncluster.CITEseq(SeuratObj),
+ SeuratObj.singler = Seurat.Singler(Seurat.wnn),
+ SeuratObj.azimuth =Seurat.Azimuth.celltypes(SeuratObj.singler),
+    
   report = target(
     command = {
-      rmarkdown::render(knitr_in("analysis-report.Rmd"))
-      file_out("analysis-report.html")
+      rmarkdown::render(knitr_in("AnalysisReport.Rmd"))
+      file_out("AnalysisReport.html")
       
     }
   )
@@ -49,3 +52,4 @@ plan <- drake_plan(
 vis_drake_graph(plan)
 
 make(plan)
+drake_gc()

@@ -104,6 +104,21 @@ visualiseExprs(sceObj,
                    feature_subset = c("FAP.1", "CD40.1"))
 ```
 
+## Compare SingleR with Azimuth for cell types
+
+
+Azimuth for now only classifies immune cel types so fibroblast and endothelial cells should be classified as "unclassified" 
+
+```{r}
+SeuratObj<- drake::readd(SeuratObj.azimuth)
+SeuratObj<-SetIdent(SeuratObj, value="predicted.celltype.l1")
+dim.plot1 <- DimPlot(SeuratObj, reduction = "wnn.umap", label = TRUE, cols = MyColorsCellTypes)
+SeuratObj<-SetIdent(SeuratObj, value="cluster.type.singler")
+dim.plot2 <- DimPlot(SeuratObj, reduction = "wnn.umap", label = TRUE, cols = MyColorsCellTypes)
+dim.plot1
+dim.plot2
+```
+
 Save Seurat and sce objects for later use
 
 ```{r, echo = FALSE}
